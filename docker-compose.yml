@@ -1,0 +1,30 @@
+version: '3.7'
+
+services:
+        web_server:
+                container_name: nginx
+                build:
+                        #location of dockerfile
+                        context: ./nginx
+                ports:
+                        - 8080:80
+                depends_on:
+                        - app
+        app:
+                container_name: flask
+                build:
+                        #location of dockerfile
+                        context: ./python
+                env_file: postgres/database.conf
+                ports:
+                        - 8000:8000
+                depends_on:
+                        - database
+             
+        database:
+                container_name: postgres
+                image: postgres:latest
+                env_file: postgres/database.conf
+                ports:
+                        - 5432:5432
+                

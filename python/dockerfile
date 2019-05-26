@@ -1,0 +1,16 @@
+FROM python:latest
+
+RUN apt update && apt install apt-file -y && apt-file update
+
+RUN apt-get install build-essential
+RUN python -m pip install --upgrade pip
+RUN python -m pip install uwsgi flask
+
+EXPOSE 8000
+
+WORKDIR /app
+
+
+COPY . .
+
+CMD ["uwsgi", "--ini", "/app/uwsgi.ini"]
