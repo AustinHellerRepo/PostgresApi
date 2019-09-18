@@ -1,4 +1,4 @@
-# Docker NGINX FLASK POSTRGRES stack
+# Docker NGINX FLASK POSTGRES stack
 
 This docker environment will run a bare bones setup for an NGINX server, flask app, and postgres server, all running in their own containers.
 
