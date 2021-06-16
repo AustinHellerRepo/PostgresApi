@@ -10,7 +10,6 @@ EXPOSE 8000
 
 WORKDIR /app
 
-
 COPY . .
 
 CMD ["uwsgi", "--ini", "/app/uwsgi.ini"]

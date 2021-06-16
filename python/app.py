@@ -5,6 +5,6 @@ app = Flask(__name__)
 
 @app.route("/")
 def index():
-    return "Hello uWSGI from python version: <br>" + version
+    return "API interface not yet implemented"
 
 application = app
