@@ -103,12 +103,12 @@ class TestDatabaseCommandPollingExecutableQueue(unittest.TestCase):
 
 		self.assertEqual(len(_order_of_callback), _inserts_total)
 		for _index in range(_inserts_total):
-			self.assertEqual(_order_of_callback[_index], _get_json_per_index(_index))
+			self.assertEqual(_order_of_callback[_index], _get_json_per_index(_inserts_total - _index - 1))
 
 	@patch.multiple(DatabaseInterface, __abstractmethods__=set())
 	def test_insert_order_respected_sequential_and_slow(self):
 
-		_inserts_total = 5
+		_inserts_total = 500
 
 		def _get_json_per_index(index: int) -> str:
 			return f'{{ "index": {index} }}'
@@ -141,7 +141,7 @@ class TestDatabaseCommandPollingExecutableQueue(unittest.TestCase):
 				executable_element=_executable_element
 			)
 
-			time.sleep(0.75)
+			time.sleep(0.001)
 
 		_database_command_polling_executable_queue.wait_until_empty()
 

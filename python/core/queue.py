@@ -167,10 +167,13 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 		self.__semaphore = threading.Semaphore()
 		self.__delayed_polling_thread = None
 		self.__processing_thread = None
-		self.__empty_wait_semaphore = threading.Semaphore(0)
-		self.__empty_done_semaphore = threading.Semaphore(0)
+		self.__wait_until_empty_wait_semaphore = threading.Semaphore(0)
+		self.__wait_until_empty_done_semaphore = threading.Semaphore(0)
 		self.__is_waiting_for_empty = False
 		self.__is_threads_active = True
+		self.__processing_thread_empty_wait_semaphore = threading.Semaphore(0)
+		self.__processing_thread_empty_done_semaphore = threading.Semaphore(0)
+		self.__is_processing_thread_empty = False
 
 		self.__start_delayed_polling_thread()
 		self.__start_processing_thread()
@@ -212,14 +215,17 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 				_executable_element = None  # type: ExecutableElement
 				self.__semaphore.acquire()
 				if len(self.__queue) != 0:
-					_executable_element = self.__queue.pop()
+					_executable_element = self.__queue.pop(0)
 				else:
+					self.__is_processing_thread_empty = True
 					if self.__is_waiting_for_empty:
-						self.__empty_wait_semaphore.release()
-						self.__empty_done_semaphore.acquire()
+						self.__wait_until_empty_wait_semaphore.release()
+						self.__wait_until_empty_done_semaphore.acquire()
 				self.__semaphore.release()
 				if _executable_element is None:
-					time.sleep(1.0)
+					self.__processing_thread_empty_wait_semaphore.acquire()
+					self.__is_processing_thread_empty = False
+					self.__processing_thread_empty_done_semaphore.release()
 				else:
 					_execution_parameters = self.get_execution_parameters()
 					_execution_result = _executable_element.execute(**_execution_parameters)
@@ -239,6 +245,10 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 
 		self.__queue.insert(0, executable_element)
 
+		if self.__is_processing_thread_empty:
+			self.__processing_thread_empty_wait_semaphore.release()
+			self.__processing_thread_empty_done_semaphore.acquire()
+
 		self.__semaphore.release()
 
 	def append_to_end_immediately(self, *, executable_element: ExecutableElement):
@@ -246,6 +256,10 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 		self.__semaphore.acquire()
 
 		self.__queue.append(executable_element)
+
+		if self.__is_processing_thread_empty:
+			self.__processing_thread_empty_wait_semaphore.release()
+			self.__processing_thread_empty_done_semaphore.acquire()
 
 		self.__semaphore.release()
 
@@ -260,6 +274,10 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 			)
 		)
 
+		if self.__is_processing_thread_empty:
+			self.__processing_thread_empty_wait_semaphore.release()
+			self.__processing_thread_empty_done_semaphore.acquire()
+
 		self.__semaphore.release()
 
 	def append_to_end_after_datetime(self, *, executable_element: ExecutableElement, delay_datetime: datetime):
@@ -272,6 +290,10 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 				delay_datetime=delay_datetime
 			)
 		)
+
+		if self.__is_processing_thread_empty:
+			self.__processing_thread_empty_wait_semaphore.release()
+			self.__processing_thread_empty_done_semaphore.acquire()
 
 		self.__semaphore.release()
 
@@ -287,6 +309,10 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 			)
 		)
 
+		if self.__is_processing_thread_empty:
+			self.__processing_thread_empty_wait_semaphore.release()
+			self.__processing_thread_empty_done_semaphore.acquire()
+
 		self.__semaphore.release()
 
 	def append_to_end_after_elapsed_seconds(self, *, executable_element: ExecutableElement, seconds_total: int):
@@ -301,19 +327,47 @@ class PollingExecutableQueue(ExecutableQueueInterface):
 			)
 		)
 
+		if self.__is_processing_thread_empty:
+			self.__processing_thread_empty_wait_semaphore.release()
+			self.__processing_thread_empty_done_semaphore.acquire()
+
 		self.__semaphore.release()
 
 	def wait_until_empty(self):
-		self.__is_waiting_for_empty = True
-		self.__empty_wait_semaphore.acquire()
-		self.__is_waiting_for_empty = False
-		self.__empty_done_semaphore.release()
+
+		_is_empty = False
+
+		self.__semaphore.acquire()
+
+		if self.__is_processing_thread_empty:
+			_is_empty = True
+
+		if not _is_empty:
+			self.__is_waiting_for_empty = True
+
+			self.__semaphore.release()
+
+			self.__wait_until_empty_wait_semaphore.acquire()
+			self.__is_waiting_for_empty = False
+			self.__wait_until_empty_done_semaphore.release()
+		else:
+			self.__semaphore.release()
 
 	def dispose(self):
+
+		self.__semaphore.acquire()
+
 		if self.__is_threads_active:
 			self.__is_threads_active = False
+
+			if self.__is_processing_thread_empty:
+				self.__processing_thread_empty_wait_semaphore.release()
+				self.__processing_thread_empty_done_semaphore.acquire()
+
 			self.__delayed_polling_thread.join()
 			self.__processing_thread.join()
+
+		self.__semaphore.release()
 
 	@abstractmethod
 	def get_execution_parameters(self) -> Dict[str, object]:
