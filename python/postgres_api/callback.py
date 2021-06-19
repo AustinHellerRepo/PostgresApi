@@ -1,4 +1,6 @@
 from __future__ import annotations
+from postgres_api.json_convertable import JsonConvertable
+from postgres_api.executable import ExecutableElement
 import jwt
 from abc import ABC, abstractmethod
 import json
@@ -13,13 +15,6 @@ class RemoteApiInterface(ABC):
 		raise NotImplementedError()
 
 
-class JsonConvertable(ABC):
-
-	@abstractmethod
-	def get_json(self) -> str:
-		raise NotImplementedError()
-
-
 class RequestsRemoteApiInterface(RemoteApiInterface):
 
 	def post(self, *, url: str, json_object: object) -> UrlResponse:
@@ -31,7 +26,7 @@ class RequestsRemoteApiInterface(RemoteApiInterface):
 		return _url_callback_response
 
 
-class Callback(ABC):
+class Callback(ExecutableElement, ABC):
 
 	@abstractmethod
 	def execute(self, *, data: object) -> JsonConvertable:
@@ -52,7 +47,7 @@ class UrlResponse(JsonConvertable):
 	def get_json_object(self) -> object:
 		return self.__json_object
 
-	def get_json(self) -> str:
+	def get_json_string(self) -> str:
 		return json.dumps({
 			"status_code": self.__status_code,
 			"json_object": self.__json_object
@@ -100,7 +95,7 @@ class JsonWebTokenCallback(UrlCallback):
 	def execute(self, *, data: object) -> JsonConvertable:
 		_json = None
 		if isinstance(data, JsonConvertable):
-			_json = json.loads(data.get_json())
+			_json = json.loads(data.get_json_string())
 		elif isinstance(data, str):
 			_json = json.loads(data)
 		else:
